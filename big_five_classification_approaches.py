@@ -52,7 +52,7 @@ def NNClassifierWithTuning(  X_train, y_train, X_val, y_val, activation=None,
         dimensions = [ (100, ) ]
 
     for act in acts:
-        nnm = neural_network.MLPClassifier( verbose=True, max_iter=100, activation=act )
+        nnm = neural_network.MLPClassifier( max_iter=100, activation=act )
         print( "Tuning activation function. Current activation function being tested:", act,
                 ". Time stamp:" , str( datetime.datetime.now() ) )
         nnm.fit( X_train, y_train )
@@ -71,7 +71,7 @@ def NNClassifierWithTuning(  X_train, y_train, X_val, y_val, activation=None,
     best_acc = 0
  
     for solv in solvs:
-        nnm = neural_network.MLPClassifier( verbose=True, max_iter=100, solver=solv )
+        nnm = neural_network.MLPClassifier( max_iter=100, solver=solv )
         print( "Tuning solver. Current solver being tested:", solv,
                 ". Time stamp:" , str( datetime.datetime.now() ) )
         nnm.fit( X_train, y_train )
@@ -90,7 +90,7 @@ def NNClassifierWithTuning(  X_train, y_train, X_val, y_val, activation=None,
     best_acc = 0
 
     for alph in alphas:
-        nnm = neural_network.MLPClassifier( verbose=True, max_iter=100, alpha=alph )
+        nnm = neural_network.MLPClassifier( max_iter=100, alpha=alph )
         print( "Tuning regularization. Current alpha being tested:", alph,
                 ". Time stamp:" , str( datetime.datetime.now() ) )
         nnm.fit( X_train, y_train )
@@ -109,7 +109,7 @@ def NNClassifierWithTuning(  X_train, y_train, X_val, y_val, activation=None,
     best_acc = 0
     
     for dim in dimensions:
-        nnm = neural_network.MLPClassifier( verbose=True, max_iter=100, hidden_layer_sizes = dim )
+        nnm = neural_network.MLPClassifier( max_iter=100, hidden_layer_sizes = dim )
         print( "Tuning hidden layer size. Current size being tested:", dim,
                 ". Time stamp:" , str( datetime.datetime.now() ) )
         nnm.fit( X_train, y_train )
@@ -126,7 +126,7 @@ def NNClassifierWithTuning(  X_train, y_train, X_val, y_val, activation=None,
     print( "Finished tuning the hidden layer size. Building the overall best model." )
     print( "-"*40 )
 
-    model = neural_network.MLPClassifier( verbose=True, max_iter=100, 
+    model = neural_network.MLPClassifier( max_iter=100, 
             hidden_layer_sizes = best_dim, alpha=best_alpha, solver=best_solver,
             activation=best_activation )
     model.fit( X_train, y_train )
@@ -250,6 +250,126 @@ def DTreeClassifier( X_train, y_train, X_val, y_val ):
     return DTModel
     pass
 
+def DTreeClassifierWithTuning( X_train, y_train, X_val, y_val, criterion=None, 
+        splitter=None, min_samples_split=None, min_samples_leaf=None ):
+
+    acc_train = [[],[],[],[]]
+    best_acc = 0
+    model = None
+    model_acc = 0
+    best_criterion = None
+    best_splitter = None
+    best_samples_split = None
+    best_samples_leaf = None
+
+    crits = None
+    if criterion is not None:
+        crits = criterion
+    else:
+        crits = ["gini"]
+
+    splits = None
+    if splitter is not None:
+        splits = splitter
+    else:
+        splits = ["best"]
+
+    sample_splits = None
+    if min_samples_split is not None:
+        sample_splits = min_samples_split
+    else:
+        sample_splits = [2]
+
+    sample_leafs = None
+    if min_samples_leaf is not None:
+        sample_leafs = min_samples_leaf
+    else:
+        sample_leafs = [1]
+
+    for crit in crits:
+        DTModel= tree.DecisionTreeClassifier( criterion=crit )
+        print( "Tuning the criterion. Current criterion being tested:", crit,
+                ". Time stamp:" , str( datetime.datetime.now() ) )
+        DTModel.fit( X_train, y_train )
+        print( "Finished fitting. Starting scoring on validation set. Time stamp:", str( datetime.datetime.now() ) )
+        acc = DTModel.score( X_val, y_val )
+        print( "Finished scoring. Here is the accuracy:", str( acc*100 ) + "%", "Time stamp:", str( datetime.datetime.now() ) )
+        acc_train[0].append( acc )
+        if acc > best_acc:
+            best_acc = acc
+            print( "Current best accuracy for criterion achieved!" )
+            best_criterion = crit
+        print()
+
+    print( "Finished tuning criterion. Moving on to tuning the splitter." )
+    print( "-"*40 )
+    best_acc = 0
+ 
+    for split in splits:
+        DTModel = tree.DecisionTreeClassifier( splitter=split )
+        print( "Tuning the splitter. Current splitter being tested:", split,
+                ". Time stamp:" , str( datetime.datetime.now() ) )
+        DTModel.fit( X_train, y_train )
+        print( "Finished fitting. Starting scoring on validation set. Time stamp:", str( datetime.datetime.now() ) )
+        acc = DTModel.score( X_val, y_val )
+        print( "Finished scoring. Here is the accuracy:", str( acc*100 ) + "%", "Time stamp:", str( datetime.datetime.now() ) )
+        acc_train[1].append( acc )
+        if acc > best_acc:
+            best_acc = acc
+            print( "Current best accuracy for splitter achieved!" )
+            best_splitter = split
+        print() 
+    
+    print( "Finished tuning the splitter. Moving on to tuning the min split size." )
+    print( "-"*40 )
+    best_acc = 0
+
+    for ssplit in sample_splits:
+        DTModel = tree.DecisionTreeClassifier( min_samples_split=ssplit )
+        print( "Tuning minimum samples split. Current min split being tested:", ssplit,
+                ". Time stamp:" , str( datetime.datetime.now() ) )
+        DTModel.fit( X_train, y_train )
+        print( "Finished fitting. Starting scoring on validation set. Time stamp:", str( datetime.datetime.now() ) )
+        acc = DTModel.score( X_val, y_val )
+        print( "Finished scoring. Here is the accuracy:", str( acc*100 ) + "%", "Time stamp:", str( datetime.datetime.now() ) )
+        acc_train[2].append( acc )
+        if acc > best_acc:
+            best_acc = acc
+            print( "Current best accuracy for min split achieved!" )
+            best_samples_split = ssplit
+        print()
+    
+    print( "Finished tuning the min split. Moving on to tuning the min leaf size." )
+    print( "-"*40 )
+    best_acc = 0
+    
+    for leaf in sample_leafs:
+        DTModel= tree.DecisionTreeClassifier( min_samples_leaf=leaf )
+        print( "Tuning min samples leaf size. Current leaf size being tested:", leaf,
+                ". Time stamp:" , str( datetime.datetime.now() ) )
+        DTModel.fit( X_train, y_train )
+        print( "Finished fitting. Starting scoring on validation set. Time stamp:", str( datetime.datetime.now() ) )
+        acc = DTModel.score( X_val, y_val )
+        print( "Finished scoring. Here is the accuracy:", str( acc*100 ) + "%", "Time stamp:", str( datetime.datetime.now() ) )
+        acc_train[3].append( acc )
+        if acc > best_acc:
+            best_acc = acc
+            print( "Current best accuracy for hidden layer size achieved!" )
+            best_samples_leaf = leaf
+        print()
+
+    print( "Finished tuning the min leaf size. Building the overall best model." )
+    print( "-"*40 )
+
+    model = tree.DecisionTreeClassifier( criterion=best_criterion, splitter=best_splitter,
+            min_samples_split=best_samples_split, min_samples_leaf=best_samples_leaf )
+    model.fit( X_train, y_train )
+    print( "Finished building the model, starting scoring against the validation set. Time stamp:", str( datetime.datetime.now() ) )
+    
+    model_acc = model.score( X_val, y_val )
+    print( "Finished building and validation the model. Time stamp:", str( datetime.datetime.now() ) )
+    return model, model_acc, acc_train, best_criterion, best_splitter, best_samples_split, best_samples_leaf
+
 
 def setUpData(file_path):
 
@@ -303,36 +423,119 @@ def main():
     X_train, y_train, X_val, y_val, X_test, y_test =  \
             setUpData( str( sys.argv[1] ) ) 
     print( X_train, y_train, X_val, y_val, X_test, y_test )
-    #sys.exit()
-    ''' 
-    #KNNModel, KNN_acc = KNNClassifier( X_train, y_train, X_val, y_val, 15, 5, 1 )
-    #n = [30]
-    #l = [10]
-    #p = [1]
+    
     n = [1] + list( range( 2, 52, 2 ) )
-    #n = list( range( 30, 38 ) )
     l = [1] + list( range( 2, 36 ) )
-    #l = list( range( 3, 10 ) )
-    # These are the tuned parameters for KNN
-    #p = [2]
-    #n = [28]
-    #l = [25]
     p = [1, 2]
     KNNModel, KNNModel_val_acc, KNN_acc_train, KNN_best_n_neighbors, KNN_best_leaf_size, KNN_best_p = KNNClassifierWithTuning( X_train, y_train, X_val, y_val, n, l, p )
-    #print( "Validation accuracy:", KNN_acc*100 )
-    #print( "Test accuracy:", KNNModel.score( X_test, y_test )*100 )
-    #KNNModel = neighbors.KNeighborsClassifier( n_neighbors=n[0], leaf_size=l[0], p=p[0] )
-    #KNNModel.fit( X_train, y_train )
-    #KNNModel_val_acc = KNNModel.score( X_val, y_val )
-    print( "KNN Model validation accuracy:", str(KNNModel_val_acc*100) + "%", "Scoring test accuracy." )
     KNNModel_test_acc = KNNModel.score( X_test, y_test )
-    print( "KNN Model test accuract:", str( KNNModel_test_acc*100) + "%" ) 
-    #np.set_printoptions( threshold=sys.maxsize )
-    print( KNNModel.predict( X_test ) )
-     
-    """
-    plt.hist( y_train )
-    plt.show()
+
+    plt.plot( n, KNN_acc_train[0] )
+    plt.xlabel( "Number of Neighbors" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "n_neigh_knn_acc_train.jpg" )
+    plt.clf()
+    plt.plot( l, KNN_acc_train[1] )
+    plt.xlabel( "Leaf Size" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "leaf_size_knn_acc_train.jpg" )
+    plt.clf()
+    plt.plot( p, KNN_acc_train[2] )
+    plt.xlabel( "Lp Norm Regularization" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "p_knn_acc_train.jpg" )
+    
+    activation = [ "identity", "logistic", "tanh", "relu" ]
+    solver = [ "lbfgs", "sgd", "adam" ]
+    alpha = [ 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3 ]
+
+    dims = [ (25,), (50,), (75,), (100,), (125,), (150,), (175,), (200,), (225,) ]
+    dims_draw = [25, 50, 75, 100, 125, 150, 175, 200, 225]
+    NNModel, NNmodel_val_acc, NN_acc_train, NN_best_activation, NN_best_solver, NN_best_alpha, NN_best_dim = NNClassifierWithTuning( X_train, y_train, X_val, y_val, activation, solver, alpha, dims ) 
+
+    plt.clf()
+    plt.plot( activation, NN_acc_train[0] )
+    plt.xlabel( "Activation Function" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "activation_nn_acc_train.jpg" )
+    plt.clf()
+    plt.plot( solver, NN_acc_train[1] )
+    plt.xlabel( "Solver" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "solver_nn_acc_train.jpg" )
+    plt.clf()
+    plt.plot( alpha, NN_acc_train[2] )
+    plt.xlabel( "Regularization constant" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "alpha_nn_acc_train.jpg" )
+    plt.clf()
+    plt.plot( dims_draw, NN_acc_train[3] )
+    plt.xlabel( "NN Hidden Layer Size" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "dim_nn_acc_train.jpg" )
+    plt.clf()
+    
+    criterion = ["gini", "entropy"]
+    splitter = ["best", "random"]
+    min_samples_split= list( range( 2, 200, 2 ) )
+    min_samples_leaf = list( range( 1, 200, 2 ) )
+    DTModel, DTModel_val_acc, DTModel_acc_train, DTModel_best_criterion, DTModel_best_splitter, DTModel_best_samples_split, DTModel_best_samples_leaf = DTreeClassifierWithTuning( 
+            X_train, y_train, X_val, y_val, criterion, splitter, min_samples_split, min_samples_leaf )
+    
+    plt.clf()
+    plt.plot( criterion, DTModel_acc_train[0] )
+    plt.xlabel( "Criterion" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "dt_criterion.jpg" )
+    plt.clf()
+    plt.plot( splitter, DTModel_acc_train[1] )
+    plt.xlabel( "Splitter" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "dt_splitter.jpg" )
+    plt.clf()
+    plt.plot( min_samples_split, DTModel_acc_train[2] )
+    plt.xlabel( "Minimum Samples Split Size" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "dt_split_size.jpg" )
+    plt.clf()
+    plt.plot( min_samples_leaf, DTModel_acc_train[3] )
+    plt.xlabel( "Minimum Samples Leaf Size" )
+    plt.ylabel( "Accuracy" )
+    plt.savefig( "dt_leaf_size.jpg" )
+    plt.clf()
+    
+
+    print( "K-Nearest-Neighbors Results:" )
+    print( "\tKNN Model Validation Accuracy:", str( KNNModel_val_acc * 100 ) + "%" )
+    print( "\tKNN Model Test Accuracy: ", str( KNNModel_test_acc * 100 ) + "%" )
+    print( "\tKNN Model Best Hyper Parameters:" )
+    print( "\t\tNumber of Neighbors:", KNN_best_n_neighbors )
+    print( "\t\tLeaf Size:", KNN_best_leaf_size )
+    print( "\t\tBest L-p Norm:", KNN_best_p )
+    print("-"*40)
+    print()
+    print( "Neural Network Results:" )
+    print( "\tNN Model Validation Accuracy:", str( NNmodel_val_acc*100 ) + "%" )
+    print( "\tNN Model Test Accuracy:", str( NNModel.score( X_test, y_test ) * 100 ) + "%" )
+    print( "\tNN Model Best Hyper Parameters:" )
+    print( "\t\tActivation Function:", NN_best_activation )
+    print( "\t\tSolver Function:", NN_best_solver )
+    print( "\t\tRegularization Alpha:", NN_best_alpha )
+    print( "\t\tHidden Layer Size:", NN_best_dim )
+    print( "-"*40 )
+    print()
+    print( "Decision Tree Results:" )
+    print( "\tDTModel validation accuracy:", str( DTModel_val_acc*100 ) + "%" )
+    print( "\tDTModel test perf:", str( DTModel.score( X_test, y_test ) * 100 ) + "%" )
+    print( "\tDTModel best hyper parameters:" )
+    print( "\t\tCriterion:", DTModel_best_criterion )
+    print( "\t\tSplitter:", DTModel_best_splitter ) 
+    print( "\t\tSamples Split:", DTModel_best_samples_split ) 
+    print( "\t\tSamples Leaf:", DTModel_best_samples_leaf )
+    print( "-"*40 )
+    print()
+    print( "Trivial Baseline Results (Majority Guess)" )
+    
     freq = dict()
     for i in y_train:
         if i not in freq:
@@ -340,27 +543,7 @@ def main():
         freq[i] += 1
 
     for i in freq:
-        print( i, freq[i], freq[i]/len(y_train) )
-    DTModel = DTreeClassifier( X_train, y_train, X_val, y_val )
-    print( "DT Model test perf:", str( DTModel.score( X_test, y_test ) * 100 ) + "%" )
-    """
-    '''
+        print( "\tLabel", i, "Occurs" , str((freq[i]/len(y_train))*100) + "%", "of the time in the training data." )
     
-    #NNModel = NNClassifier( X_train, y_train, X_val, y_val )
-    #activation = [ "identity", "logistic", "tanh", "relu" ]
-    #solver = [ "lbfgs", "sgd", "adam" ]
-    #alpha = [ 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03 ]
-
-    activation = ['relu']
-    solver=['adam']
-    alpha=[0.01, 0.03, 0.1, 0.3]
-    dims = [ (25,), (50,), (75,), (100,), (125,), (150,), (175,) ]
-    NNModel, NNmodel_val_acc, NN_acc_train, NN_best_activation, NN_best_solver, NN_best_alpha, NN_best_dim = NNClassifierWithTuning( X_train, y_train, X_val, y_val, activation, solver, alpha, dims ) 
-    print( "NN Model validation accuracy", str( NNmodel_val_acc*100 ) + "%", "Scoring test accuracy." )
-    print( "NN Model test perf:", str( NNModel.score( X_test, y_test ) * 100 ) + "%" )
-    pass
-    
-    
-
 
 main()
