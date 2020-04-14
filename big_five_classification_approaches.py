@@ -167,7 +167,7 @@ def KNNClassifierWithTuning( X_train, y_train, X_val, y_val, n_neighbors=None, l
         ps = [1,2]
 
     for neigh in neighs:
-        knn = neighbors.KNeighborsClassifier( n_neighbors=neigh, algorithm='kd_tree', weights='distance' )
+        knn = neighbors.KNeighborsClassifier( n_neighbors=neigh )
         print( "Tuning n_neighbors. Current n being tested:", neigh, ". Time stamp:", str( datetime.datetime.now() ) )
         knn.fit( X_train, y_train )
         print( "Finished fitting. Starting scoring on validation set. Time stamp:", str( datetime.datetime.now() ) )
@@ -185,7 +185,7 @@ def KNNClassifierWithTuning( X_train, y_train, X_val, y_val, n_neighbors=None, l
     best_acc = 0
     
     for leaf in leafs:
-        knn = neighbors.KNeighborsClassifier( leaf_size=leaf, algorithm='kd_tree', weights='distance' )
+        knn = neighbors.KNeighborsClassifier( leaf_size=leaf )
         print( "Tuning leaf size. Current leaf size being tested:", leaf, ". Time stamp:", str( datetime.datetime.now() ) )
         knn.fit( X_train, y_train )
         print( "Finished fitting. Starting scoring on validation set. Time stamp:", str( datetime.datetime.now() ) )
@@ -220,7 +220,7 @@ def KNNClassifierWithTuning( X_train, y_train, X_val, y_val, n_neighbors=None, l
     print( "-"*40 )
     
     model = neighbors.KNeighborsClassifier( n_neighbors=best_n_neighbors,
-            leaf_size=best_leaf_size, p=best_p, algorithm='kd_tree', weights='distance' )
+            leaf_size=best_leaf_size, p=best_p )
     print( "Starting to fit the model with hyperparameters n_neighbors =", best_n_neighbors, "leaf size =", best_leaf_size, "and p =", best_p, ". Time stamp:", str( datetime.datetime.now() ) )
     
     model.fit( X_train, y_train )
@@ -230,14 +230,6 @@ def KNNClassifierWithTuning( X_train, y_train, X_val, y_val, n_neighbors=None, l
     
     print( "Finished building and validating best model! Time stamp:", str( datetime.datetime.now() ) )
     return model, model_acc, acc_train, best_n_neighbors, best_leaf_size, best_p
-"""
-    knn = neighbors.KNeighborsClassifier( n_neighbors=n_neighbors, 
-            leaf_size=leaf_size, p=p )
-    knn.fit( X_train, y_train )
-    print( "Finished training" )
-    acc = knn.score( X_val, y_val )
-    return knn, acc
-"""
 
 
 def DTreeClassifier( X_train, y_train, X_val, y_val ):
@@ -354,7 +346,7 @@ def DTreeClassifierWithTuning( X_train, y_train, X_val, y_val, criterion=None,
         acc_train[3].append( acc )
         if acc > best_acc:
             best_acc = acc
-            print( "Current best accuracy for hidden layer size achieved!" )
+            print( "Current best accuracy for leaf size achieved!" )
             best_samples_leaf = leaf
         print()
 
@@ -385,6 +377,7 @@ def setUpData(file_path):
     
     # I prefer to work with numpy arrays as I have not worked with Pandas before.
     data = df.to_numpy()
+    # Drop all the meaningless data.
     data = data[~np.any( data == 0, axis=1 ) ]
 
     # Shuffling the data consistently with "pi" as the seed because I like the 
@@ -401,7 +394,6 @@ def setUpData(file_path):
     y = y.astype( int )
 
     # Print the shapes of the original data
-    print( "Original data shapes:", X.shape, y.shape )
 
     # Split the data into the train - validate - test sets to do hyperparameter
     # tuning properly. I rescale the X values to be slightly more meaningful 
@@ -419,92 +411,146 @@ def setUpData(file_path):
 
 
 def main():
-     
+    if len( sys.argv ) < 2:
+        print( "How to use the script:" )
+        print( "\tpython3 big_five_classification_approaches.py path/to/dataset [tune]" )
+        print( "\tThe [tune] parameter is optional, and will indicate that you want",
+                "to retune all the hyper parameters. This can take a long time" )
+        sys.exit()
+
     X_train, y_train, X_val, y_val, X_test, y_test =  \
             setUpData( str( sys.argv[1] ) ) 
-    print( X_train, y_train, X_val, y_val, X_test, y_test )
     
-    n = [1] + list( range( 2, 52, 2 ) )
-    l = [1] + list( range( 2, 36 ) )
-    p = [1, 2]
-    KNNModel, KNNModel_val_acc, KNN_acc_train, KNN_best_n_neighbors, KNN_best_leaf_size, KNN_best_p = KNNClassifierWithTuning( X_train, y_train, X_val, y_val, n, l, p )
-    KNNModel_test_acc = KNNModel.score( X_test, y_test )
+    # Previously tuned hyper parameters. Used if the user does not want to 
+    # retune the hyper parameters. 
+    KNN_best_n_neighbors, KNN_best_leaf_size, KNN_best_p = 50, 25, 2
+    NN_best_activation, NN_best_solver, NN_best_alpha, NN_best_dim = "relu", "adam", 0.01, (200,)
+    DTModel_best_criterion, DTModel_best_splitter, DTModel_best_samples_split, DTModel_best_samples_leaf = "gini", "best", 194, 131 
+    KNNModel = None
+    NNModel = None
+    DTModel = None
+    KNNModel_val_acc = 0
+    NNmodel_val_acc = 0
+    DTModel_val_acc = 0
+    KNNModel_test_acc = 0 
+    
+    if len( sys.argv ) < 3:
+        KNNModel = neighbors.KNeighborsClassifier( n_neighbors=KNN_best_n_neighbors,
+                leaf_size=KNN_best_leaf_size, p=KNN_best_p )
+        print( "Building the model with the tuned hyper parameters for KNN" )
+        KNNModel.fit( X_train, y_train )
+        print( "Done training, calculating prediction accuracies." )
+        KNNModel_val_acc = KNNModel.score( X_val, y_val )
+        KNNModel_test_acc = KNNModel.score( X_test, y_test )
 
-    plt.plot( n, KNN_acc_train[0] )
-    plt.xlabel( "Number of Neighbors" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "n_neigh_knn_acc_train.jpg" )
-    plt.clf()
-    plt.plot( l, KNN_acc_train[1] )
-    plt.xlabel( "Leaf Size" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "leaf_size_knn_acc_train.jpg" )
-    plt.clf()
-    plt.plot( p, KNN_acc_train[2] )
-    plt.xlabel( "Lp Norm Regularization" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "p_knn_acc_train.jpg" )
-    
-    activation = [ "identity", "logistic", "tanh", "relu" ]
-    solver = [ "lbfgs", "sgd", "adam" ]
-    alpha = [ 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3 ]
+        NNModel = neural_network.MLPClassifier( max_iter=100, hidden_layer_sizes=NN_best_dim,
+                alpha=NN_best_alpha, solver=NN_best_solver, activation=NN_best_activation )
+        print( "Building the model with the tuned hyper parameters for NN" )
+        NNModel.fit( X_train, y_train )
+        print( "Done training, calculating prediction accuracies." )
+        NNmodel_val_acc = NNModel.score( X_val, y_val )
 
-    dims = [ (25,), (50,), (75,), (100,), (125,), (150,), (175,), (200,), (225,) ]
-    dims_draw = [25, 50, 75, 100, 125, 150, 175, 200, 225]
-    NNModel, NNmodel_val_acc, NN_acc_train, NN_best_activation, NN_best_solver, NN_best_alpha, NN_best_dim = NNClassifierWithTuning( X_train, y_train, X_val, y_val, activation, solver, alpha, dims ) 
+        DTModel = tree.DecisionTreeClassifier( criterion=DTModel_best_criterion,
+                splitter=DTModel_best_splitter, min_samples_split=DTModel_best_samples_split,
+                min_samples_leaf=DTModel_best_samples_leaf )
+        print( "Building the model with the tuned hyper parameters for DT" )
+        DTModel.fit( X_train, y_train )
+        print( "Done training, calculating prediction accuracies." )
+        DTModel_val_acc = DTModel.score( X_val, y_val )
 
-    plt.clf()
-    plt.plot( activation, NN_acc_train[0] )
-    plt.xlabel( "Activation Function" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "activation_nn_acc_train.jpg" )
-    plt.clf()
-    plt.plot( solver, NN_acc_train[1] )
-    plt.xlabel( "Solver" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "solver_nn_acc_train.jpg" )
-    plt.clf()
-    plt.plot( alpha, NN_acc_train[2] )
-    plt.xlabel( "Regularization constant" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "alpha_nn_acc_train.jpg" )
-    plt.clf()
-    plt.plot( dims_draw, NN_acc_train[3] )
-    plt.xlabel( "NN Hidden Layer Size" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "dim_nn_acc_train.jpg" )
-    plt.clf()
-    
-    criterion = ["gini", "entropy"]
-    splitter = ["best", "random"]
-    min_samples_split= list( range( 2, 200, 2 ) )
-    min_samples_leaf = list( range( 1, 200, 2 ) )
-    DTModel, DTModel_val_acc, DTModel_acc_train, DTModel_best_criterion, DTModel_best_splitter, DTModel_best_samples_split, DTModel_best_samples_leaf = DTreeClassifierWithTuning( 
-            X_train, y_train, X_val, y_val, criterion, splitter, min_samples_split, min_samples_leaf )
-    
-    plt.clf()
-    plt.plot( criterion, DTModel_acc_train[0] )
-    plt.xlabel( "Criterion" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "dt_criterion.jpg" )
-    plt.clf()
-    plt.plot( splitter, DTModel_acc_train[1] )
-    plt.xlabel( "Splitter" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "dt_splitter.jpg" )
-    plt.clf()
-    plt.plot( min_samples_split, DTModel_acc_train[2] )
-    plt.xlabel( "Minimum Samples Split Size" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "dt_split_size.jpg" )
-    plt.clf()
-    plt.plot( min_samples_leaf, DTModel_acc_train[3] )
-    plt.xlabel( "Minimum Samples Leaf Size" )
-    plt.ylabel( "Accuracy" )
-    plt.savefig( "dt_leaf_size.jpg" )
-    plt.clf()
-    
+    else:
+        # You can modify the hyper parameter list to tune from here. These are
+        # the hyper parameters for the KNN classifier.
+        n = [1] + list( range( 2, 52, 2 ) )
+        l = [1] + list( range( 2, 36 ) )
+        p = [1, 2]
+        KNNModel, KNNModel_val_acc, KNN_acc_train, KNN_best_n_neighbors, KNN_best_leaf_size, KNN_best_p = KNNClassifierWithTuning( X_train, y_train, X_val, y_val, n, l, p )
+        KNNModel_test_acc = KNNModel.score( X_test, y_test )
 
+        # Save all the training accuracy plots for KNN
+        plt.plot( n, KNN_acc_train[0] )
+        plt.xlabel( "Number of Neighbors" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "n_neigh_knn_acc_train.jpg" )
+        plt.clf()
+        plt.plot( l, KNN_acc_train[1] )
+        plt.xlabel( "Leaf Size" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "leaf_size_knn_acc_train.jpg" )
+        plt.clf()
+        plt.plot( p, KNN_acc_train[2] )
+        plt.xlabel( "Lp Norm Regularization" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "p_knn_acc_train.jpg" )
+        
+        # You can modify the hyper parameter list to tune from here. These are
+        # the hyper parameters for the MLP Classifier (Neural Network)
+        activation = [ "identity", "logistic", "tanh", "relu" ]
+        solver = [ "lbfgs", "sgd", "adam" ]
+        alpha = [ 0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3 ]
+        dims = [ (25,), (50,), (75,), (100,), (125,), (150,), (175,), (200,), (225,) ]
+        dims_draw = [25, 50, 75, 100, 125, 150, 175, 200, 225]
+
+        NNModel, NNmodel_val_acc, NN_acc_train, NN_best_activation, NN_best_solver, NN_best_alpha, NN_best_dim = NNClassifierWithTuning( X_train, y_train, X_val, y_val, activation, solver, alpha, dims ) 
+
+        # Save all the training accuracy plots for the MLP Classifier.
+        plt.clf()
+        plt.plot( activation, NN_acc_train[0] )
+        plt.xlabel( "Activation Function" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "activation_nn_acc_train.jpg" )
+        plt.clf()
+        plt.plot( solver, NN_acc_train[1] )
+        plt.xlabel( "Solver" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "solver_nn_acc_train.jpg" )
+        plt.clf()
+        plt.plot( alpha, NN_acc_train[2] )
+        plt.xlabel( "Regularization constant" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "alpha_nn_acc_train.jpg" )
+        plt.clf()
+        plt.plot( dims_draw, NN_acc_train[3] )
+        plt.xlabel( "NN Hidden Layer Size" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "dim_nn_acc_train.jpg" )
+        plt.clf()
+        
+        # You can modify the hyper parameter list to tune from here. These are
+        # the hyper parameters for the Decision Tree Classifier.
+        criterion = ["gini", "entropy"]
+        splitter = ["best", "random"]
+        min_samples_split= list( range( 2, 200, 2 ) )
+        min_samples_leaf = list( range( 1, 200, 2 ) )
+
+        DTModel, DTModel_val_acc, DTModel_acc_train, DTModel_best_criterion, DTModel_best_splitter, DTModel_best_samples_split, DTModel_best_samples_leaf = DTreeClassifierWithTuning( 
+                X_train, y_train, X_val, y_val, criterion, splitter, min_samples_split, min_samples_leaf )
+        
+        # Save all the training accuracy plots for the DT Classifier.
+        plt.clf()
+        plt.plot( criterion, DTModel_acc_train[0] )
+        plt.xlabel( "Criterion" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "dt_criterion.jpg" )
+        plt.clf()
+        plt.plot( splitter, DTModel_acc_train[1] )
+        plt.xlabel( "Splitter" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "dt_splitter.jpg" )
+        plt.clf()
+        plt.plot( min_samples_split, DTModel_acc_train[2] )
+        plt.xlabel( "Minimum Samples Split Size" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "dt_split_size.jpg" )
+        plt.clf()
+        plt.plot( min_samples_leaf, DTModel_acc_train[3] )
+        plt.xlabel( "Minimum Samples Leaf Size" )
+        plt.ylabel( "Accuracy" )
+        plt.savefig( "dt_leaf_size.jpg" )
+        plt.clf()
+        
+
+    # Print out all the results. 
     print( "K-Nearest-Neighbors Results:" )
     print( "\tKNN Model Validation Accuracy:", str( KNNModel_val_acc * 100 ) + "%" )
     print( "\tKNN Model Test Accuracy: ", str( KNNModel_test_acc * 100 ) + "%" )
